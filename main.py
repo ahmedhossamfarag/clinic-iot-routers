@@ -25,7 +25,7 @@ mqtt_client.connect()
 # BLE ADVERTISEMENT HANDLER
 # ==============================================================================
 def advertisement_handler(device, advertisement_data):
-    if DEVICE_NAME == device.name and device.rssi >= MIN_RSSI:
+    if DEVICE_NAME == device.name and advertisement_data.rssi >= MIN_RSSI:
         print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
         
         # Extract the raw bytes from the advertisement data
@@ -53,7 +53,7 @@ async def run_ble_scanner():
     try:
         # Keep the background scanning task alive indefinitely.
         while True:
-            time.sleep(1)  # Sleep briefly to prevent maxing out the CPU
+            await asyncio.sleep(1)  # Sleep briefly to prevent maxing out the CPU
     finally:
         # If the script closes, turn off the scanner cleanly.
         await scanner.stop()
