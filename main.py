@@ -27,14 +27,14 @@ mqtt_client.connect()
 def advertisement_handler(device, advertisement_data):
     if DEVICE_NAME == device.name and advertisement_data.rssi >= MIN_RSSI:
         print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
-        
-        # Extract the raw bytes from the advertisement data
-        raw_data = advertisement_data.manufacturer_data.get()  # 0xFFFF is a common placeholder
-        
-        if utils.is_uuid(raw_data):
+
+        # Extract the service UUIDs from the advertisement data
+        service_uuids = advertisement_data.service_uuids
+
+        if service_uuids and len(service_uuids):
             # Convert the raw bytes into a Python dictionary
-            data_dict = utils.json_serializable(ROUTER_ID, raw_data.hex())
-            
+            data_dict = utils.json_serializable(ROUTER_ID, service_uuids[0])
+
             if data_dict:
                 mqtt_client.publish(data_dict)
             else:
