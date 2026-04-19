@@ -1,28 +1,102 @@
-import dotenv
-import os
-import paho.mqtt.client as mqtt
-import time
-
-# MQTT Broker settings
-
+import dotenv                 # Loads environment variables from a .env file (for MQTT credentials)
+import os                    # Accesses those environment variables
+import asyncio               # Handles asynchronous tasks (waiting for BLE without freezing)
+from bleak import BleakScanner # The core Bluetooth Low Energy library
+import threading             # Allows us to run multiple "lanes" of code simultaneously
+import time                  # Added to fix the CPU max-out bug in the main loop
+import publisher as mqtt_client            # Our custom MQTT publishing module (see publisher.py)
+import utils                 # Our custom utility functions (see utils.py)
+# ============================================================================== 
+# BLE SETTINGS
+# ==============================================================================
 dotenv.load_dotenv()
 
-MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_PORT = int(os.getenv("MQTT_PORT"))
-MQTT_TOPIC = os.getenv("MQTT_TOPIC")
-MQTT_USERNAME = os.getenv("MQTT_USERNAME")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+DEVICE_NAME = os.getenv("DEVICE_NAME")
+ROUTER_ID = os.getenv("ROUTER_ID")
+MIN_RSSI = int(os.getenv("MIN_RSSI", -80))  # Default to -80 if not set
 
-# Create MQTT client and connect to broker
+# ============================================================================== 
+# MQTT CONNECTION
+# ==============================================================================
+mqtt_client.connect()
 
-client = mqtt.Client()
-client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
-# Publish data to MQTT topic in a loop
+# ============================================================================== 
+# BLE ADVERTISEMENT HANDLER
+# ==============================================================================
+def advertisement_handler(device, advertisement_data):
+    if DEVICE_NAME == device.name and device.rssi >= MIN_RSSI:
+        print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
+        
+        # Extract the raw bytes from the advertisement data
+        raw_data = advertisement_data.manufacturer_data.get()  # 0xFFFF is a common placeholder
+        
+        if utils.is_uuid(raw_data):
+            # Convert the raw bytes into a Python dictionary
+            data_dict = utils.json_serializable(ROUTER_ID, raw_data.hex())
+            
+            if data_dict:
+                mqtt_client.publish(data_dict)
+            else:
+                print("⚠️ Data is not JSON serializable. Skipping publish.")
+            
 
-while True:
-    data = "Hello from Edge Node!"
-    client.publish(MQTT_TOPIC, data)
-    print(f"Published: {data}")
-    time.sleep(5)
+# ============================================================================== 
+# ASYNC BLE LOOP (The Background Engine)
+# ==============================================================================
+async def run_ble_scanner():
+    scanner = BleakScanner(detection_callback=advertisement_handler)
+    
+    # Turn on the computer's Bluetooth receiver
+    await scanner.start()
+    
+    try:
+        # Keep the background scanning task alive indefinitely.
+        while True:
+            time.sleep(1)  # Sleep briefly to prevent maxing out the CPU
+    finally:
+        # If the script closes, turn off the scanner cleanly.
+        await scanner.stop()
+
+# ============================================================================== 
+# THREAD HELPER
+# ==============================================================================
+def start_ble_in_thread():
+    # Create a new asyncio event loop for this thread, since the main thread is busy with MQTT.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Execute our 'run_ble_scanner' function inside this new loop
+    loop.run_until_complete(run_ble_scanner())
+
+# ============================================================================== 
+# SCRIPT ENTRY POINT (The Main Thread)
+# ==============================================================================
+if __name__ == "__main__":
+    
+    # 1. CREATE THE BACKGROUND THREAD
+    # daemon=True means "If the main script closes, immediately kill this thread too." 
+    # Otherwise, the script would keep running invisibly in the background.
+    ble_thread = threading.Thread(target=start_ble_in_thread, daemon=True)
+    ble_thread.start()
+    
+    try:
+        print("⚡ Main thread running MQTT. BLE is running in background thread.")
+        
+        # 2. THE MAIN LOOP
+        # We need an infinite loop here to keep the main Python script from reaching 
+        # the end of the file and closing immediately.
+        while True:
+            # Sleep briefly to prevent maxing out the CPU. 
+            # The BLE scanning is happening in the background thread, so we don't need to do anything here.
+            time.sleep(1)
+            
+    except KeyboardInterrupt:
+        # 3. CLEAN SHUTDOWN
+        # If you press Ctrl+C, catch the error and execute a graceful shutdown sequence.
+        print("\n🛑 Script manually stopped by user.")
+        
+        # Stop the background network agent
+        mqtt_client.stop()
+        
+        print("🔌 Disconnected from MQTT Server. Exiting...")
