@@ -33,7 +33,7 @@ def advertisement_handler(device, advertisement_data):
 
         if service_uuids and len(service_uuids):
             # Convert the raw bytes into a Python dictionary
-            data_dict = utils.json_serializable(ROUTER_ID, service_uuids[0])
+            data_dict = utils.json_serializable(ROUTER_ID, service_uuids[0], advertisement_data.rssi)
 
             if data_dict:
                 mqtt_client.publish(data_dict)
