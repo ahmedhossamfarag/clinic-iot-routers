@@ -11,11 +11,21 @@ MQTT_PORT = int(os.getenv("MQTT_PORT"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+TLS_CA_FILE = os.getenv("TLS_CA")
+TLS_CERT_FILE = os.getenv("TLS_CERT")
+TLS_KEY_FILE = os.getenv("TLS_KEY")
 
 # Create MQTT client and connect to broker
 
 mqtt_client = mqtt.Client()
 mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+
+if TLS_CERT_FILE and TLS_KEY_FILE and TLS_CA_FILE:
+    mqtt_client.tls_set(
+        ca_certs=TLS_CA_FILE, 
+        certfile=TLS_CERT_FILE, 
+        keyfile=TLS_KEY_FILE
+        )
 
 def connect():
     print("☁️ Connecting to MQTT Broker ...")
