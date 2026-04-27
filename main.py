@@ -133,6 +133,10 @@ async def main():
     # Initial MQTT connection
     mqtt_client.connect()
 
+    while not mqtt_client.mqtt_client.is_connected():
+        print("⏳ Waiting for MQTT connection...")
+        await asyncio.sleep(1)
+
     await asyncio.gather(
         ble_scanner_task(),       
         mqtt_publisher_task(),   
