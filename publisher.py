@@ -61,7 +61,7 @@ def on_connect_fail(client, userdata, rc):
 
 # Function to publish data to MQTT topic
 def publish(payload):
-    mqtt_client.publish(MQTT_TOPIC, payload)
+    mqtt_client.publish(MQTT_TOPIC, payload).wait_for_publish(timeout=1)
     print(f"📤 Published to MQTT: {payload}")
 
 
