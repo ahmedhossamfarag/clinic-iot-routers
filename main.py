@@ -14,12 +14,14 @@ DEVICE_NAME = os.getenv("DEVICE_NAME")
 ROUTER_ID = os.getenv("ROUTER_ID")
 MIN_RSSI = int(os.getenv("MIN_RSSI", -80))  # Default to -80 if not set
 MIN_PUBLISH_INTERVAL = int(os.getenv("MIN_PUBLISH_INTERVAL", 10))  # Default to 10
+DEFAULT_RSSI = -9999
 
 # ==============================================================================
 # GLOBAL ASYNC QUEUE and DICT
 # ==============================================================================
-publish_queue = asyncio.Queue()
+publish_queue = asyncio.Queue(maxsize=1000)
 last_sent = dict()
+max_rssi = dict()
 
 # ============================================================================== 
 # BLE ADVERTISEMENT HANDLER
@@ -72,30 +74,50 @@ async def ble_scanner_task():
 # QUEUE CONSUMER -> MQTT
 # ==============================================================================
 
-def will_publish(device_id):
+def can_publish(device_id):
     now = time.time()
     if device_id in last_sent:
         if now - last_sent[device_id] < MIN_PUBLISH_INTERVAL:
             return False
     
-    last_sent[device_id] = now
     return True
+
+
+def mark_published(device_id):
+    last_sent[device_id] = time.time()
+
+
+def getRSSI(device_id, rssi):
+    return max(max_rssi.get(device_id, DEFAULT_RSSI), rssi)
+
+def setRSSI(device_id, rssi):
+    max_rssi[device_id] = getRSSI(device_id, rssi)
+
+def resetRSSI(device_id):
+    max_rssi.pop(device_id, None)
+
 
 async def mqtt_publisher_task():
     while True:
         data = await publish_queue.get()
 
         # Check last sent time
-        if not will_publish(data[0]):
+        if not can_publish(data[0]):
+            setRSSI(data[0], data[1])
+            publish_queue.task_done()
             continue
         
         # Convert the raw bytes into a Python dictionary
-        data_dict = utils.json_serializable(ROUTER_ID, data[0], data[1])
+        rssi = getRSSI(data[0], data[1])
+        data_dict = utils.json_serializable(ROUTER_ID, data[0], rssi)
 
         if data_dict:
             try:
                 mqtt_client.publish(data_dict)
+                mark_published(data[0])
+                resetRSSI(data[0])
             except Exception:
+                setRSSI(data[0], data[1])
                 pass
             
         publish_queue.task_done()
