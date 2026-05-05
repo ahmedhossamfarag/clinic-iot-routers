@@ -10,6 +10,7 @@ dotenv.load_dotenv()
 MQTT_BROKER = os.getenv("MQTT_BROKER")
 MQTT_PORT = int(os.getenv("MQTT_PORT"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC")
+MQTT_STATE_TOPIC = os.getenv("MQTT_STATE_TOPIC")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 TLS_CA_FILE = os.getenv("TLS_CA_FILE")
@@ -63,6 +64,11 @@ def on_connect_fail(client, userdata, rc):
 def publish(payload):
     mqtt_client.publish(MQTT_TOPIC, payload)
     print(f"📤 Published to MQTT: {payload}")
+
+
+def publish_state(payload):
+    mqtt_client.publish(MQTT_STATE_TOPIC, payload)
+    print(f"📤 Published state to MQTT: {payload}")
 
 
 # Function to stop the MQTT client loop and disconnect

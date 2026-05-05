@@ -23,3 +23,16 @@ def json_serializable(router_id: str, device_id: str, rssi):
         return data
     except (TypeError, OverflowError):
         return False
+    
+
+def json_serializable_state(router_id: str, device_id: str, state: int):
+    try:
+        obj = {
+            "router_id": router_id,
+            "device_id": device_id,
+            "state": state
+        }
+        data = json.dumps(obj)
+        return data
+    except (TypeError, OverflowError):
+        return False
