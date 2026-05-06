@@ -15,7 +15,8 @@ ROUTER_ID = os.getenv("ROUTER_ID")
 MIN_RSSI = int(os.getenv("MIN_RSSI", -80))  # Default to -80 if not set
 MIN_PUBLISH_INTERVAL = int(os.getenv("MIN_PUBLISH_INTERVAL", 10))  # Default to 10
 DEFAULT_RSSI = -9999
-DEFAULT_STATE = -1
+DEFAULT_STATE = 0
+MAX_STATE = 5
 
 # ==============================================================================
 # GLOBAL ASYNC QUEUE and DICT
@@ -39,7 +40,6 @@ def advertisement_handler(device, advertisement_data):
     print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
 
     # Extract the service UUIDs from the advertisement data
-    print(f"🔍 Advertisement data: {advertisement_data.service_uuids}")
     service_uuids = advertisement_data.service_uuids
 
     if not service_uuids:
@@ -48,16 +48,11 @@ def advertisement_handler(device, advertisement_data):
     try:
         # manufacturer_data is a dict. We usually want the value of the first key.
         manuf_value = DEFAULT_STATE
-        print(advertisement_data.manufacturer_data)
         if advertisement_data.manufacturer_data:
-            print(list(advertisement_data.manufacturer_data.values()))
-            # Get the first value from the manufacturer data dictionary
-            values = list(advertisement_data.manufacturer_data.values())
-            if len(values) > 0 and len(values[0]) > 0:
-                manuf_value = values[0][0]
+            manuf_value = int.from_bytes(advertisement_data.manufacturer_data[0])
 
         publish_queue.put_nowait((service_uuids[0], advertisement_data.rssi, manuf_value))
-        print(f"✅ Added to publish queue: {service_uuids[0]} with RSSI {advertisement_data.rssi} and state {manuf_value}")
+        print(f"✅ Queued data for MQTT: {service_uuids[0]}, RSSI: {advertisement_data.rssi}, State: {manuf_value}")
     except Exception:
         print("⚠️ Publish queue full. Skipping...")
         pass
@@ -132,7 +127,7 @@ def handleRSSI(device_id, rssi):
         
 
 def handleState(device_id, state: int):
-    if last_state.get(device_id, DEFAULT_STATE) != state:
+    if state != DEFAULT_STATE and state <= MAX_STATE and last_state.get(device_id, DEFAULT_STATE) != state:
         last_state[device_id] = state
 
         data_dict = utils.json_serializable_state(ROUTER_ID, device_id, state)
