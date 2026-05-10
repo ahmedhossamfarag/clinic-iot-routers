@@ -23,3 +23,15 @@ def json_serializable(router_id: str, device_id: str, rssi):
         return data
     except (TypeError, OverflowError):
         return False
+    
+
+def json_serializable_active_signal(router_id: str):
+    try:
+        obj = {
+            "router_id": router_id,
+            "status": "active"
+        }
+        data = json.dumps(obj)
+        return data
+    except (TypeError, OverflowError):
+        return False

@@ -10,6 +10,7 @@ dotenv.load_dotenv()
 MQTT_BROKER = os.getenv("MQTT_BROKER")
 MQTT_PORT = int(os.getenv("MQTT_PORT"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC")
+MQTT_ROUTER_TOPIC = os.getenv("MQTT_ROUTER_TOPIC")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 TLS_CA_FILE = os.getenv("TLS_CA_FILE")
@@ -27,15 +28,16 @@ if TLS_CA_FILE:
         ca_certs=os.path.join(base_path, TLS_CA_FILE),
         certfile=os.path.join(base_path, TLS_CERT_FILE) if TLS_CERT_FILE else None,
         keyfile=os.path.join(base_path, TLS_KEY_FILE) if TLS_KEY_FILE else None,
-        tls_version=ssl.PROTOCOL_TLSv1_2
-        )
+        tls_version=ssl.PROTOCOL_TLSv1_2,
+    )
+
 
 def connect():
     print("☁️ Connecting to MQTT Broker ...")
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
-    # IMPORTANT: loop_start() tells the MQTT library to create its OWN background 
-    # thread to manage network traffic. This means we don't have to manually check 
+    # IMPORTANT: loop_start() tells the MQTT library to create its OWN background
+    # thread to manage network traffic. This means we don't have to manually check
     # for network drops in our main code!
     mqtt_client.on_connect = on_connect
     mqtt_client.on_connect_fail = on_connect_fail
@@ -63,6 +65,11 @@ def on_connect_fail(client, userdata, rc):
 def publish(payload):
     mqtt_client.publish(MQTT_TOPIC, payload)
     print(f"📤 Published to MQTT: {payload}")
+
+
+def publish_active_signal(payload):
+    mqtt_client.publish(MQTT_ROUTER_TOPIC, payload)
+    print(f"📤 Published to MQTT Router Topic: {payload}")
 
 
 # Function to stop the MQTT client loop and disconnect
