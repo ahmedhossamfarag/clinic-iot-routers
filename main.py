@@ -12,13 +12,16 @@ import utils  # Our custom utility functions (see utils.py)
 dotenv.load_dotenv()
 
 DEVICE_NAME = os.getenv("DEVICE_NAME")
-ROUTER_ID = os.getenv("ROUTER_ID")
+SERVICE_ID = os.getenv("SERVICE_ID")
 MIN_RSSI = int(os.getenv("MIN_RSSI", -80))  # Default to -80 if not set
 MIN_PUBLISH_INTERVAL = int(os.getenv("MIN_PUBLISH_INTERVAL", 10))  # Default to 10
 DEFAULT_RSSI = -9999
 ROUTER_ACTIVE_INTERVAL = int(
     os.getenv("ROUTER_ACTIVE_INTERVAL", 60)
 )  # Default to 60 seconds
+
+# This should be replaced with code that retrieves the actual MAC address of the ESP32 when deployed on hardware. For testing on a computer, you can set it to any unique identifier.
+ROUTER_ID = os.getenv("ROUTER_ID")  # The mac address of the current router. Should be replaced with the actual mac address when ESP32 is used.
 
 # ==============================================================================
 # GLOBAL ASYNC QUEUE and DICT
@@ -39,7 +42,6 @@ def advertisement_handler(device, advertisement_data):
     if advertisement_data.rssi < MIN_RSSI:
         return
 
-    print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
 
     # Extract the service UUIDs from the advertisement data
     service_uuids = advertisement_data.service_uuids
@@ -47,8 +49,13 @@ def advertisement_handler(device, advertisement_data):
     if not service_uuids:
         return
 
+    if SERVICE_ID not in service_uuids[0]:
+        return
+
+    print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
+
     try:
-        publish_queue.put_nowait((service_uuids[0], advertisement_data.rssi))
+        publish_queue.put_nowait((device.address, advertisement_data.rssi))
     except Exception:
         print("⚠️ Publish queue full. Skipping...")
         pass
