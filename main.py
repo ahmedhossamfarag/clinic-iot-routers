@@ -52,10 +52,10 @@ def advertisement_handler(device, advertisement_data):
     if SERVICE_ID not in service_uuids[0]:
         return
 
-    print(f"📡 Detected BLE Advertisement from {device.name} ({device.address})")
+    print(f"📡 Detected BLE Advertisement from {device.name} ({device.address.lower()})")
 
     try:
-        publish_queue.put_nowait((device.address, advertisement_data.rssi))
+        publish_queue.put_nowait((device.address.lower(), advertisement_data.rssi))
     except Exception:
         print("⚠️ Publish queue full. Skipping...")
         pass
